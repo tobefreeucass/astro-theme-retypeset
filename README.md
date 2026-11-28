@@ -1,4 +1,6 @@
-# Editorial of the Light of Humanity
+# 人文之光社论
+
+*Editorial of the Light of Humanity*
 
 「人文之光社论」与读者来稿的备用发布站。基于 [Astro](https://astro.build/) 和 [Retypeset](https://github.com/radishzzz/astro-theme-retypeset)，部署于 GitHub Pages。
 
@@ -27,8 +29,13 @@ pnpm preview
 
 运营状态的事件保存在 [site-status.json](src/data/site-status.json)。维护 skill 的 set-status.mjs 提供 incident 和 recovery 操作。日期变化与发布构建本身不会生成运营事件。
 
-## 零点自动同步评估
+## 每日零点同步
 
-GitHub Actions 支持以 Asia/Shanghai 为时区配置每日零点计划，整点任务可能延迟。可先从托管运行器手动试抓公开合集和原图，确认来源可访问，再启用按合集位置增量同步。有新增且校验通过时才写入归档并触发部署，无新增时保留当前发布结果。[GitHub 调度文档](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#schedule)
+[部署工作流](.github/workflows/deploy.yml) 每天北京时间 00:00 检查公众号公开合集。Ubuntu 托管运行器已实测可访问合集、正文和图片。GitHub 整点调度可能延迟。[GitHub 调度文档](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#schedule)
 
-当前工作流由人工推送和手动触发启动。由 GITHUB_TOKEN 推送的提交不会触发现有的 push 部署。同步工作流可在同一次运行完成构建发布，或显式触发已有的部署工作流。[GitHub 令牌触发规则](https://docs.github.com/en/actions/concepts/security/github_token#when-github_token-triggers-workflow-runs)
+- 有新文章时，保存原文正文、正文图、头图、封面和公众号摘要。用合集位置与原文链接校验增量边界，核对正文和配图后构建。构建成功后，以 `Anonymous <anonymous@example.invalid>` 提交并推送，随后在同一次工作流中发布 Pages。
+- 没有新文章时，工作流正常结束，跳过提交和部署。源站获取、内容校验或构建失败时，现有归档和已发布站点保持原样。
+- 手动同步可在 Actions 选择 **Deploy to GitHub Pages → Run workflow**，勾选 `sync_wechat`。取消勾选会直接构建并发布当前 `master`。
+- 本地可运行 `node scripts/sync-wechat.mjs` 检查并归档新增内容。脚本只修改工作区。已有文章及图片路径会保留，后续运行以归档索引中的最新来源为基准。
+
+同步使用 `GITHUB_TOKEN`，无需个人令牌。GitHub 会记录认证推送，公开提交使用匿名作者和提交者。[GitHub 令牌触发规则](https://docs.github.com/en/actions/concepts/security/github_token#when-github_token-triggers-workflow-runs)

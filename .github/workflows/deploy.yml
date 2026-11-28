@@ -3,23 +3,39 @@ name: Deploy to GitHub Pages
 on:
   push:
     branches: [master]
+  schedule:
+    - cron: '0 0 * * *'
+      timezone: Asia/Shanghai
   workflow_dispatch:
+    inputs:
+      sync_wechat:
+        description: 同步公众号，仅在有新文章时提交和部署
+        type: boolean
+        default: false
 
 permissions:
   contents: read
-  pages: write
-  id-token: write
 
 concurrency:
   group: pages
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   build:
+    if: github.ref == 'refs/heads/master'
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pages: read
+    env:
+      SYNC_WECHAT: ${{ github.event_name == 'schedule' || inputs.sync_wechat }}
+    outputs:
+      ready: ${{ steps.artifact.outcome == 'success' }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          ref: refs/heads/master
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
@@ -33,22 +49,59 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Sync public WeChat articles
+        if: env.SYNC_WECHAT == 'true'
+        id: sync
+        shell: bash
+        run: |
+          node scripts/sync-wechat.mjs
+          if git diff --quiet -- src/data/wechat-archive.json; then
+            echo 'changed=false' >> "$GITHUB_OUTPUT"
+            echo '公众号无新增，跳过提交和部署。' >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo 'changed=true' >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Build site
+        if: env.SYNC_WECHAT != 'true' || steps.sync.outputs.changed == 'true'
         run: pnpm build
         env:
           NODE_OPTIONS: --max-old-space-size=6144
 
       - name: Configure Pages
+        if: env.SYNC_WECHAT != 'true' || steps.sync.outputs.changed == 'true'
         uses: actions/configure-pages@v5
 
       - name: Upload artifact
+        if: env.SYNC_WECHAT != 'true' || steps.sync.outputs.changed == 'true'
+        id: artifact
         uses: actions/upload-pages-artifact@v3
         with:
           path: dist
 
+      - name: Commit and push synchronized articles
+        if: steps.sync.outputs.changed == 'true'
+        shell: bash
+        env:
+          GIT_AUTHOR_NAME: Anonymous
+          GIT_AUTHOR_EMAIL: anonymous@example.invalid
+          GIT_COMMITTER_NAME: Anonymous
+          GIT_COMMITTER_EMAIL: anonymous@example.invalid
+        run: |
+          git add -- src/data/wechat-archive.json src/content/posts public/wechat
+          git diff --cached --check
+          git -c commit.gpgSign=false commit -m 'Sync public WeChat articles'
+          test "$(git log -1 --format='%an <%ae>|%cn <%ce>')" = 'Anonymous <anonymous@example.invalid>|Anonymous <anonymous@example.invalid>'
+          git push origin HEAD:refs/heads/master
+          printf '已匿名提交并推送 %s，等待 Pages 发布。\n' "$(git rev-parse --short HEAD)" >> "$GITHUB_STEP_SUMMARY"
+
   deploy:
     needs: build
+    if: needs.build.outputs.ready == 'true'
     runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}

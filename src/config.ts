@@ -4,15 +4,15 @@ export const themeConfig: ThemeConfig = {
   // SITE INFORMATION >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> START
   site: {
     // site title
-    title: 'Editorial of the Light of Humanity',
+    title: '人文之光社论',
     // site subtitle
-    subtitle: '',
+    subtitle: 'Editorial of the Light of Humanity',
     // site description
     description: '人文之光社论备用站，收录「人文之光」公众号的社论、汇总与读者来稿。主号受限于平台，此处作为独立备用发布渠道，保留全部历史文章与原始图文。',
     // use i18n title/subtitle/description from src/i18n/ui.ts instead of static ones above
     i18nTitle: false, // true | false
     // author name
-    author: '人文之光',
+    author: 'Editorial of the Light of Humanity',
     // site url
     url: 'https://tobefreeucass.github.io',
     // base path
