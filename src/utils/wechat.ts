@@ -1,4 +1,5 @@
 import records from '@/data/wechat-archive.json'
+import supplements from '@/data/wechat-supplements.json'
 
 interface WechatArticle {
   source: string
@@ -9,7 +10,7 @@ interface WechatArticle {
   cover?: string
 }
 
-const archive: Record<string, WechatArticle | undefined> = records
+const archive: Record<string, WechatArticle | undefined> = { ...records, ...supplements }
 
 export function getWechatArticle(slug: string) {
   return archive[slug]
