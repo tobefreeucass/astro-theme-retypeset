@@ -1,0 +1,168 @@
+---
+import { allLocales } from '@/config'
+import { getLangFromLocale, getLangRouteParam } from '@/i18n/lang'
+import Layout from '@/layouts/Layout.astro'
+import { getArchiveStats } from '@/utils/archive-stats'
+
+export function getStaticPaths() {
+  return allLocales.map(lang => ({ params: { lang: getLangRouteParam(lang) } }))
+}
+
+const stats = await getArchiveStats(getLangFromLocale(Astro.currentLocale))
+const fmt = new Intl.NumberFormat('zh-CN')
+const maxPosts = Math.max(1, ...stats.series.map(year => year.posts))
+const maxTerm = stats.cloud[0]?.[1] ?? 1
+const metrics = [
+  ['已发布文章', stats.posts],
+  ['正文总字数', stats.words],
+  ['读者投稿文章', stats.readerPosts],
+  ['可识别投稿条目', stats.submissions],
+  ['有发布的日子', stats.activeDays],
+  ['运营跨度（天）', stats.span],
+] as const
+---
+
+<Layout pageTitle="运营统计">
+  <div class="uno-decorative-line"></div>
+  <article class="heti archive-stats" lang="zh-CN">
+    <h1 class="post-title">运营统计</h1>
+    {stats.posts === 0
+? (
+      <p>暂无已发布文章。</p>
+    )
+: (
+      <>
+        <p class="stats-dates">
+          收录 <time datetime={stats.first}>{stats.first}</time> 至 <time datetime={stats.latest}>{stats.latest}</time> 发布的文章
+          <span> · 更新于 <time datetime={stats.today}>{stats.today}</time></span>
+        </p>
+        <dl class="stats-totals">
+          {metrics.map(([label, count]) => (
+            <div>
+              <dt>{label}</dt>
+              <dd>{fmt.format(count)}</dd>
+            </div>
+          ))}
+        </dl>
+        <p class="stats-note">字数按正文汉字和其他文字词组计。投稿条目按可识别的独立来稿段落计。运营跨度从首篇发布算到本次构建日。</p>
+
+        <section aria-labelledby="annual-publishing">
+          <h2 id="annual-publishing">年度发布</h2>
+          <ul class="stats-series">
+            {stats.series.map(year => (
+              <li>
+                <div class="stats-bar-row">
+                  <span>{year.year}</span>
+                  <div class="stats-track" aria-hidden="true"><span style={{ width: `${100 * year.posts / maxPosts}%` }}></span></div>
+                  <span>{fmt.format(year.posts)} 篇</span>
+                </div>
+                <small>正文 {fmt.format(year.words)} 字 · 投稿 {fmt.format(year.submissions)} 条</small>
+              </li>
+            ))}
+          </ul>
+        </section>
+
+        <section aria-labelledby="operating-span">
+          <h2 id="operating-span">运营时长</h2>
+          <p class="stats-note">每年的发布日占当年归档覆盖天数的比例。</p>
+          <ul class="stats-series">
+            {stats.series.map(year => (
+              <li class="stats-bar-row">
+                <span>{year.year}</span>
+                <div class="stats-track" aria-hidden="true"><span style={{ width: `${100 * year.active / year.span}%` }}></span></div>
+                <span>{year.active} / {year.span} 天</span>
+              </li>
+            ))}
+          </ul>
+        </section>
+
+        <section aria-labelledby="publishing-calendar">
+          <h2 id="publishing-calendar">运营日历</h2>
+          <p class="stats-note">按北京时间统计。每周从周一开始，颜色越深，当日发布越多。</p>
+          {stats.series.toReversed().map((year, index) => (
+            <details class="calendar-year" open={index === 0}>
+              <summary><span>{year.year} 年</span><span class="font-time">{year.posts} 篇 · {year.active} 个发布日</span></summary>
+              <div class="calendar-months">
+                {year.months.map(month => (
+                  <div>
+                    <div class="calendar-month-label">{month.month} 月 <small>{month.count} 篇</small></div>
+                    <div class="calendar-grid">
+                      {Array.from({ length: month.leading }, () => <span aria-hidden="true"></span>)}
+                      {month.cells.map(cell => (
+                        <span
+                          class="calendar-day"
+                          data-level={cell.available ? Math.min(4, cell.count) : undefined}
+                          title={cell.available ? `${cell.date} · ${cell.count} 篇` : undefined}
+                          role={cell.count ? 'img' : undefined}
+                          aria-label={cell.count ? `${cell.date} 发布 ${cell.count} 篇` : undefined}
+                          aria-hidden={!cell.count ? 'true' : undefined}
+                        ></span>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </details>
+          ))}
+        </section>
+
+        <section aria-labelledby="word-cloud">
+          <h2 id="word-cloud">正文词云</h2>
+          <p class="stats-note">按出现频次显示，已过滤常见虚词、投稿套话和结构标签。</p>
+          <ul class="word-cloud">
+            {stats.cloud.map(([word, count]) => (
+              <li
+                style={{ fontSize: `${0.92 + 1.36 * Math.sqrt(count / maxTerm)}rem` }}
+                title={`${word} · ${count} 次`}
+              >
+                {word}<span class="sr-only"> · {count} 次</span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      </>
+    )}
+  </article>
+</Layout>
+
+<style>
+  .archive-stats {
+    --stats-line: color-mix(in srgb, currentColor 21%, transparent);
+    --stats-fill: color-mix(in srgb, currentColor 61%, transparent);
+  }
+
+  .archive-stats section { margin-block: 2.25rem; }
+  .archive-stats h2 { margin-block: 0 0.65rem; font-size: 1.35rem; }
+  .archive-stats p { text-align: start; }
+  .stats-dates, .stats-note { font-size: 0.875rem; line-height: 1.65; }
+  .stats-totals {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(9rem, 100%), 1fr));
+    gap: 0.8rem 1rem;
+    margin-block: 1.2rem 0.8rem;
+  }
+  .stats-totals div { border-block-start: 1px solid var(--stats-line); padding-block-start: 0.65rem; }
+  .stats-totals dt { font-size: 0.85rem; }
+  .stats-totals dd { margin: 0.2rem 0 0; font-size: clamp(1.25rem, 4vw, 1.8rem); font-weight: 600; font-variant-numeric: tabular-nums; }
+  .archive-stats .stats-series, .archive-stats .word-cloud { list-style: none; padding: 0; margin-block: 0.8rem; }
+  .stats-series li { margin-block: 0.65rem; }
+  .stats-series small { display: block; margin-inline-start: 3.5rem; margin-block-start: 0.2rem; font-size: 0.8rem; }
+  .stats-bar-row { display: grid; grid-template-columns: 3rem minmax(2rem, 1fr) auto; align-items: center; gap: 0.5rem; font-size: 0.875rem; font-variant-numeric: tabular-nums; }
+  .stats-track { height: 0.36rem; background: var(--stats-line); border-radius: 0.2rem; overflow: hidden; }
+  .stats-track span { display: block; height: 100%; background: var(--stats-fill); border-radius: inherit; }
+  .calendar-year { border-block-start: 1px solid var(--stats-line); }
+  .calendar-year summary { cursor: pointer; padding-block: 0.75rem; }
+  .calendar-year summary span + span { margin-inline-start: 0.75rem; font-size: 0.8rem; }
+  .calendar-months { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(7rem, 100%), 1fr)); padding-block: 0.25rem 1.25rem; gap: 0.85rem; }
+  .calendar-month-label { margin-block-end: 0.35rem; font-size: 0.825rem; }
+  .calendar-month-label small { margin-inline-start: 0.2rem; font-size: 0.75rem; }
+  .calendar-grid { display: grid; gap: 0.17rem; grid-template-columns: repeat(7, minmax(0, 1fr)); }
+  .calendar-grid span { aspect-ratio: 1; border-radius: 0.15rem; }
+  .calendar-day[data-level="0"] { background: color-mix(in srgb, currentColor 9%, transparent); }
+  .calendar-day[data-level="1"] { background: color-mix(in srgb, currentColor 29%, transparent); }
+  .calendar-day[data-level="2"] { background: color-mix(in srgb, currentColor 47%, transparent); }
+  .calendar-day[data-level="3"] { background: color-mix(in srgb, currentColor 69%, transparent); }
+  .calendar-day[data-level="4"] { background: currentColor; }
+  .archive-stats .word-cloud { display: flex; align-items: baseline; flex-wrap: wrap; gap: 0.4rem 0.95rem; border-block: 1px solid var(--stats-line); padding-block: 0.9rem; }
+  .word-cloud li { margin: 0; line-height: 1.4; white-space: nowrap; }
+</style>

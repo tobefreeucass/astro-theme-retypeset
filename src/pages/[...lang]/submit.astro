@@ -1,0 +1,45 @@
+---
+import { allLocales } from '@/config'
+import { getLangRouteParam } from '@/i18n/lang'
+import Layout from '@/layouts/Layout.astro'
+
+export function getStaticPaths() {
+  return allLocales.map(lang => ({ params: { lang: getLangRouteParam(lang) } }))
+}
+
+const original = 'https://mp.weixin.qq.com/s/b6e3bKrMaiZYsM2lzeZZsQ'
+const guide = 'https://mp.weixin.qq.com/s?__biz=Mzg2MjcwNzQ1Mw==&mid=2247489419&idx=1&sn=f5dfcce5112e7ebf2c451131821f2667&chksm=ce029c19f975150f8bfb9e53d9bd62dfb25ac00408ec4697527fdef52d3ad288ab42026aa9c1&scene=21#wechat_redirect'
+const email = '2Qg7n@proton.me'
+---
+
+<Layout pageTitle="我要投稿">
+  <div class="uno-decorative-line"></div>
+  <article class="heti submission" lang="zh-CN">
+    <h1 class="post-title">我要投稿</h1>
+    <p class="submission-intro">向「人文之光社论」提交读者来稿。</p>
+
+    <h2>短稿 · 公众号留言</h2>
+    <p>打开公众号原文，按投稿须知留言。</p>
+    <a href={original} rel="external">在微信中查看投稿须知</a>
+
+    <h2>长稿 · 邮件投稿</h2>
+    <p>将稿件发至 <a href={`mailto:${email}`}>{email}</a>，再到公众号后台留言提醒查收。</p>
+
+    <h2>投稿前</h2>
+    <p>请写清事件信息，例如发生在哪个校区，并注明特殊要求。需要梳理写作思路时，可以参考<a href={guide} rel="external">《投稿指南》</a>。</p>
+
+    <p class="submission-confirmation">收到公众号确认回复后，投稿才算成功。若邮件未获回复，或稿件可能漏发，可在公众号后台再次提醒。</p>
+  </article>
+</Layout>
+
+<style>
+  .submission { line-height: 1.85; }
+  .submission h2 { margin-block: 1.6em 0.4em; font-size: 1.25rem; }
+  .submission p { text-align: start; }
+  .submission-intro { margin-block-start: 0.5rem; }
+  .submission-confirmation {
+    margin-block-start: 1.75rem;
+    border-inline-start: 2px solid color-mix(in srgb, currentColor 30%, transparent);
+    padding-inline-start: 1rem;
+  }
+</style>

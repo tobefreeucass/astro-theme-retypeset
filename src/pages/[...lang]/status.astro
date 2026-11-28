@@ -1,0 +1,122 @@
+---
+import { allLocales } from '@/config'
+import { getLangRouteParam } from '@/i18n/lang'
+import Layout from '@/layouts/Layout.astro'
+import { shanghaiDay } from '@/utils/shanghai-time'
+import { getStatusDays, hasIncident, lastStatusEvent, statusEvents } from '@/utils/site-status'
+
+export function getStaticPaths() {
+  return allLocales.map(lang => ({ params: { lang: getLangRouteParam(lang) } }))
+}
+
+const dateTime = new Intl.DateTimeFormat('zh-CN', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Asia/Shanghai' })
+const today = shanghaiDay()
+const days = getStatusDays()
+---
+
+<Layout pageTitle="运营状态">
+  <div class="uno-decorative-line"></div>
+  <article class="heti site-status" lang="zh-CN">
+    <h1 class="post-title">运营状态</h1>
+    <div class="status-now" data-incident={hasIncident ? 'true' : undefined}>
+      <p class="status-now-label"><span aria-hidden="true"></span>{hasIncident ? '运营异常' : '运营正常'}</p>
+      {hasIncident && lastStatusEvent?.summary && <p>{lastStatusEvent.summary}</p>}
+      <p class="status-date">北京时间 <time data-status-today datetime={today}>{today}</time></p>
+    </div>
+
+    <section aria-labelledby="status-last-30">
+      <h2 id="status-last-30">近 30 天</h2>
+      <div class="status-days" id="status-days">
+        {days.map(day => (
+          <span
+            role="img"
+            aria-label={day.date + (day.incident ? '有异常记录' : '运营正常')}
+            title={day.date + (day.incident ? ' · 有异常记录' : ' · 运营正常')}
+            data-incident={day.incident ? 'true' : undefined}
+          ></span>
+        ))}
+      </div>
+      <div class="status-range">
+        <time id="status-from" datetime={days[0].date}>{days[0].date}</time>
+        <time data-status-today datetime={today}>{today}</time>
+      </div>
+      <p class="status-date">根据人工发布的异常与恢复记录显示。</p>
+    </section>
+
+    <section aria-labelledby="status-history">
+      <h2 id="status-history">运营事件</h2>
+      {statusEvents.length
+? (
+        <ol class="status-events">
+          {statusEvents.toReversed().map(event => (
+            <li>
+              <time datetime={event.at}>{dateTime.format(new Date(event.at))}</time>
+              <strong>{event.type === 'incident' ? '状态异常' : '状态恢复'}</strong>
+              {event.summary && <p>{event.summary}</p>}
+            </li>
+          ))}
+        </ol>
+      )
+: (
+        <p>暂无运营事件记录。</p>
+      )}
+    </section>
+  </article>
+</Layout>
+
+<style>
+  .site-status { --normal: #27815d; --incident: #c34c40; }
+  .site-status h2 { margin-block: 1.7em 0.7em; font-size: 1.3rem; }
+  .site-status p { text-align: start; }
+  .status-now {
+    --current: var(--normal);
+    margin-block: 1.1rem 1.5rem;
+    padding: 0.9rem 1.1rem;
+    border-inline-start: 2px solid var(--current);
+    background: color-mix(in srgb, var(--current) 10%, transparent);
+  }
+  .status-now[data-incident] { --current: var(--incident); }
+  .status-now p { margin-block: 0.25rem; }
+  .status-now-label { display: flex; gap: 0.5rem; align-items: center; font-weight: 650; }
+  .status-now-label span { width: 0.5rem; height: 0.5rem; border-radius: 50%; background: var(--current); }
+  .status-date, .status-range, .status-events time { font-size: 0.85rem; }
+  .status-days { display: grid; grid-template-columns: repeat(30, minmax(0, 1fr)); gap: 0.21rem; }
+  .status-days span { min-height: 1.1rem; border-radius: 0.15rem; background: var(--normal); }
+  .status-days span[data-incident] { background: var(--incident); }
+  .status-range { display: flex; justify-content: space-between; margin-block: 0.45rem 0.6rem; font-variant-numeric: tabular-nums; }
+  .site-status .status-events { list-style: none; margin: 0; padding: 0; }
+  .status-events li { border-block-start: 1px solid color-mix(in srgb, currentColor 20%, transparent); padding-block: 0.65rem; }
+  .status-events strong { margin-inline-start: 0.65rem; font-weight: 600; }
+  @media (max-width: 480px) {
+    .status-days { grid-template-columns: repeat(15, minmax(0, 1fr)); }
+  }
+</style>
+
+<script>
+import { getStatusDays } from '@/utils/site-status'
+
+function refreshCalendar() {
+  const strip = document.querySelector<HTMLElement>('#status-days')
+  const from = document.querySelector<HTMLTimeElement>('#status-from')
+  if (!strip || !from) {
+    return
+  }
+
+  const days = getStatusDays()
+  if (from.dateTime === days[0].date) {
+    return
+  }
+
+  from.dateTime = days[0].date
+  from.textContent = days[0].date
+  for (const [index, marker] of Array.from(strip.children).entries()) {
+    const day = days[index]
+    marker.toggleAttribute('data-incident', day.incident)
+    marker.setAttribute('title', day.date + (day.incident ? ' · 有异常记录' : ' · 运营正常'))
+    marker.setAttribute('aria-label', day.date + (day.incident ? '有异常记录' : '运营正常'))
+  }
+}
+document.addEventListener('astro:page-load', refreshCalendar)
+document.addEventListener('visibilitychange', refreshCalendar)
+window.setInterval(refreshCalendar, 60_000)
+</script>

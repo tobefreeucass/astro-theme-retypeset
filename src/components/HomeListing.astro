@@ -1,0 +1,190 @@
+---
+import type { HomePage } from '@/utils/home'
+import PostList from '@/components/PostList.astro'
+import { getLocalizedPath } from '@/i18n/path'
+import { ui } from '@/i18n/ui'
+import Layout from '@/layouts/Layout.astro'
+import { groupPostsByYear } from '@/utils/content'
+
+type Props = HomePage
+
+const { lang, page, total, pinned, regular, timeline } = Astro.props
+const postsByYear = groupPostsByYear(regular)
+const pagePath = (number: number) => getLocalizedPath(number === 1 ? '/' : `/page/${number}/`, lang)
+const { pagination, previousPage, nextPage } = ui[lang]
+
+function monthLabel(timestamp: number) {
+  const date = new Date(timestamp)
+  return `${date.getUTCFullYear()}.${String(date.getUTCMonth() + 1).padStart(2, '0')}`
+}
+
+const dates = new Intl.DateTimeFormat(lang, { dateStyle: 'medium', timeZone: 'UTC' })
+---
+
+<Layout>
+  {pinned.length > 0 && (
+    <section class="mb-7.5">
+      <div class="uno-decorative-line" />
+      <PostList posts={pinned} {lang} pinned />
+    </section>
+  )}
+
+  {Array.from(postsByYear.values(), posts => (
+    <section class="mb-7.5">
+      <div class="uno-decorative-line" />
+      <PostList {posts} {lang} />
+    </section>
+  ))}
+
+  {total > 1 && (
+    <nav aria-label={pagination} class="archive-pagination">
+      <ol class="archive-timeline">
+        {timeline.map(({ page: number, latest, earliest }) => {
+          const dateRange = latest !== undefined && earliest !== undefined
+            ? dates.formatRange(earliest, latest)
+            : undefined
+          return (
+            <li>
+              <a
+                href={pagePath(number)}
+                aria-current={number === page ? 'page' : undefined}
+                title={dateRange}
+              >
+                <span class="archive-month" aria-hidden={dateRange ? 'true' : undefined}>
+                  {latest !== undefined ? monthLabel(latest) : ''}
+                </span>
+                <span class="archive-number">
+                  {number}
+                  {dateRange && <span class="sr-only"> · {dateRange}</span>}
+                </span>
+              </a>
+            </li>
+          )
+        })}
+      </ol>
+      <div class="grid grid-cols-[1fr_auto_1fr] items-center gap-2 pt-1 text-sm">
+        {page > 1 && (
+          <a class="col-start-1 row-start-1 w-fit py-3 underline hover:c-primary" href={pagePath(page - 1)} rel="prev">
+            {previousPage}
+          </a>
+        )}
+        <span class="col-start-2 row-start-1 font-time">{page} / {total}</span>
+        {page < total && (
+          <a class="col-start-3 row-start-1 justify-self-end py-3 text-right underline hover:c-primary" href={pagePath(page + 1)} rel="next">
+            {nextPage}
+          </a>
+        )}
+      </div>
+    </nav>
+  )}
+</Layout>
+
+<style>
+  .archive-pagination {
+    margin-block-start: 2.5rem;
+  }
+
+  .archive-timeline {
+    display: flex;
+    overflow-x: auto;
+    padding-block-end: 0.45rem;
+    scrollbar-width: thin;
+    scrollbar-color: color-mix(in srgb, currentColor 30%, transparent) transparent;
+    scroll-snap-type: x proximity;
+  }
+
+  .archive-timeline li {
+    flex: 1 0 4.75rem;
+    min-width: 0;
+    scroll-snap-align: center;
+  }
+
+  .archive-timeline a {
+    position: relative;
+    display: grid;
+    justify-items: center;
+    gap: 0.65rem;
+    padding: 0.3rem 0.2rem;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .archive-timeline a::before,
+  .archive-timeline a::after {
+    position: absolute;
+    inset-block-start: 1.75rem;
+    inset-inline-start: 50%;
+    content: '';
+  }
+
+  .archive-timeline a::before {
+    inset-inline: 0;
+    block-size: 1px;
+    background: currentColor;
+    opacity: 0.25;
+  }
+
+  .archive-timeline li:first-child a::before {
+    inset-inline-start: 50%;
+  }
+
+  .archive-timeline li:last-child a::before {
+    inset-inline-end: 50%;
+  }
+
+  .archive-timeline a::after {
+    inline-size: 0.32rem;
+    block-size: 0.32rem;
+    border-radius: 50%;
+    background: currentColor;
+    transform: translate(-50%, calc(-50% + 0.5px));
+  }
+
+  .archive-month {
+    min-block-size: 1rem;
+    font-size: 0.75rem;
+    line-height: 1rem;
+  }
+
+  .archive-number {
+    min-inline-size: 1.65rem;
+    margin-block-start: 0.2rem;
+    border: 1px solid transparent;
+    border-radius: 999px;
+    padding-inline: 0.15rem;
+    text-align: center;
+    font-size: 0.8125rem;
+    line-height: 1.4rem;
+  }
+
+  .archive-timeline a:hover .archive-number,
+  .archive-timeline a[aria-current] .archive-number {
+    border-color: currentColor;
+  }
+
+  .archive-timeline a[aria-current] {
+    font-weight: 700;
+  }
+
+  .archive-timeline a[aria-current]::after {
+    inline-size: 0.55rem;
+    block-size: 0.55rem;
+  }
+
+  .archive-timeline a:focus-visible {
+    outline: 1px solid currentColor;
+    outline-offset: -2px;
+  }
+</style>
+
+<script>
+  document.addEventListener('astro:page-load', () => {
+    const timeline = document.querySelector<HTMLOListElement>('.archive-timeline')
+    const current = timeline?.querySelector('[aria-current="page"]')
+    if (timeline && current) {
+      const bounds = timeline.getBoundingClientRect()
+      const item = current.getBoundingClientRect()
+      timeline.scrollLeft += (item.left + item.width / 2) - (bounds.left + bounds.width / 2)
+    }
+  })
+</script>

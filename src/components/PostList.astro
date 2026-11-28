@@ -1,0 +1,121 @@
+---
+import type { Language } from '@/i18n/config'
+import type { Post } from '@/types'
+import PinIcon from '@/assets/icons/pin-icon.svg'
+import PostDate from '@/components/PostDate.astro'
+import { base } from '@/config'
+import { getPostPath } from '@/i18n/path'
+import { getPostDescription } from '@/utils/description'
+import { isHomePage } from '@/utils/page'
+import { getWechatArticle } from '@/utils/wechat'
+
+export interface Props {
+  posts: Post[]
+  lang: Language
+  pinned?: boolean
+}
+
+const { posts, lang, pinned = false } = Astro.props
+const isHome = isHomePage(Astro.url.pathname)
+---
+
+<ul>
+  {posts.map((post) => {
+    const slug = post.data.abbrlink || post.id
+    const wechat = isHome ? getWechatArticle(slug) : undefined
+    const cover = wechat?.cover ?? wechat?.head
+
+    return (
+      <li
+        class:list={[
+          'mb-5.5',
+          isHome ? 'lg:mb-10' : '',
+          cover && 'home-post-with-cover',
+        ]}
+      >
+        {cover && <img class="home-post-cover" src={base + cover} alt="" width="64" height="64" loading="lazy" decoding="async" />}
+        {/* post title */}
+        <h3 class="inline transition-colors hover:c-primary">
+          <a
+            class:list={[
+              'cjk:tracking-wide',
+              isHome ? 'lg:font-medium lg:text-4.5' : '',
+            ]}
+            href={getPostPath(slug, lang)}
+            data-disable-theme-toggle-transition
+          >
+            {post.data.title}
+          </a>
+          {/* pinned icon */}
+          {pinned && (
+            <PinIcon
+              aria-hidden="true"
+              class="ml-0.25em inline-block aspect-square w-0.98em translate-y--0.1em lg:(w-1.05em translate-y--0.15em)"
+              fill="currentColor"
+            />
+          )}
+        </h3>
+
+        {/* mobile post time */}
+        <div
+          class="py-0.8 text-3.5 font-time lg:hidden"
+          data-disable-theme-toggle-transition
+        >
+          <PostDate
+            date={post.data.published}
+            minutes={post.remarkPluginFrontmatter.minutes}
+          />
+        </div>
+
+        {/* desktop post time */}
+        <div class="hidden text-3.65 font-time lg:(ml-2.5 inline)">
+          <PostDate
+            date={post.data.published}
+            minutes={post.remarkPluginFrontmatter.minutes}
+          />
+        </div>
+
+        {/* desktop post description */}
+        {isHome && (
+          <div
+            class:list={['heti', wechat?.summary ? 'home-post-summary' : 'hidden']}
+            lg="mt-2.25 block"
+          >
+            <p>{getPostDescription(post, 'list')}</p>
+          </div>
+        )}
+      </li>
+    )
+  })}
+</ul>
+
+<style>
+  .home-post-with-cover {
+    display: flow-root;
+  }
+
+  @media (max-width: 1023px) {
+    .home-post-summary {
+      margin-block-start: 0.2rem;
+      font-size: 0.875rem;
+    }
+
+    .home-post-summary p {
+      display: -webkit-box;
+      overflow: hidden;
+      margin-block-end: 0;
+      -webkit-box-orient: vertical;
+      -webkit-line-clamp: 2;
+    }
+  }
+
+  .home-post-cover {
+    float: inline-end;
+    width: clamp(2.75rem, 8vw, 4rem);
+    height: auto;
+    aspect-ratio: 1;
+    margin-inline-start: 0.85rem;
+    border-radius: 0.25rem;
+    object-fit: cover;
+  }
+</style>

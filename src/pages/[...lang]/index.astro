@@ -1,0 +1,18 @@
+---
+import type { HomePage } from '@/utils/home'
+import HomeListing from '@/components/HomeListing.astro'
+import { allLocales } from '@/config'
+import { getLangRouteParam } from '@/i18n/lang'
+import { getHomePages } from '@/utils/home'
+
+export async function getStaticPaths() {
+  return Promise.all(allLocales.map(async lang => ({
+    params: { lang: getLangRouteParam(lang) },
+    props: (await getHomePages(lang))[0],
+  })))
+}
+
+type Props = HomePage
+---
+
+<HomeListing {...Astro.props} />

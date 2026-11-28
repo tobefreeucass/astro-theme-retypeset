@@ -1,0 +1,185 @@
+---
+import { allLocales, base } from '@/config'
+import { getLangFromLocale, getLangRouteParam } from '@/i18n/lang'
+import { getSearchMessages } from '@/i18n/search'
+import Layout from '@/layouts/Layout.astro'
+
+export function getStaticPaths() {
+  return allLocales.map(lang => ({ params: { lang: getLangRouteParam(lang) } }))
+}
+
+const messages = getSearchMessages(getLangFromLocale(Astro.currentLocale))
+---
+
+<Layout pageTitle={messages.title}>
+  <section
+    id="article-search"
+    aria-labelledby="search-title"
+    data-index-url={`${base}/pagefind/pagefind.js`}
+    data-pending={messages.pending}
+    data-empty={messages.empty}
+    data-failed={messages.failed}
+    data-count={messages.count}
+  >
+    <div class="uno-decorative-line"></div>
+    <h1 id="search-title" class="mb-5 text-7 c-primary font-semibold">{messages.title}</h1>
+    <form method="get" action={Astro.url.pathname} role="search" class="search-form" data-astro-reload>
+      <label for="search-query" class="sr-only">{messages.title}</label>
+      <input id="search-query" type="search" name="q" placeholder={messages.placeholder} maxlength="180" required />
+      <button type="submit">{messages.nav}</button>
+    </form>
+    <noscript><p class="mt-5 text-sm">{messages.requiresScript}</p></noscript>
+    <p id="search-status" class="mt-5 text-sm" role="status"></p>
+    <ul id="search-results" class="mt-4" aria-labelledby="search-title"></ul>
+    <button id="search-more" class="search-more" type="button" hidden>{messages.more}</button>
+  </section>
+</Layout>
+
+<style>
+  .search-form {
+    display: flex;
+    gap: 0.75rem;
+    border-block-end: 1px solid color-mix(in srgb, currentColor 28%, transparent);
+  }
+
+  .search-form:focus-within {
+    border-block-end-color: currentColor;
+  }
+
+  .search-form input {
+    flex: 1;
+    min-inline-size: 0;
+    min-block-size: 2.75rem;
+    padding-inline: 0.25rem;
+    background: transparent;
+    color: inherit;
+  }
+
+  .search-form button,
+  .search-more {
+    min-block-size: 2.75rem;
+    padding-inline: 0.5rem;
+    color: inherit;
+    cursor: pointer;
+    text-underline-offset: 0.26em;
+  }
+
+  .search-form button:hover,
+  .search-more:hover {
+    text-decoration: underline;
+  }
+
+  .search-more {
+    margin-block-start: 0.85rem;
+    text-decoration: underline;
+  }
+
+  #search-results :global(li) {
+    padding-block: 0.95rem;
+    border-block-end: 1px solid color-mix(in srgb, currentColor 16%, transparent);
+  }
+
+  #search-results :global(a) {
+    font-size: 1.125rem;
+    font-weight: 600;
+    overflow-wrap: anywhere;
+  }
+
+  #search-results :global(a:hover) {
+    text-decoration: underline;
+    text-underline-offset: 0.2em;
+  }
+
+  #search-results :global(p) {
+    margin-block-start: 0.3rem;
+    font-size: 0.9375rem;
+    line-height: 1.7;
+    overflow-wrap: anywhere;
+  }
+
+  #search-results :global(mark) {
+    --at-apply: 'bg-highlight text-inherit';
+  }
+</style>
+
+<script>
+  interface SearchResult {
+    url: string
+    excerpt: string
+    meta: { title?: string }
+  }
+
+  interface Pagefind {
+    search: (query: string) => Promise<{ results: { data: () => Promise<SearchResult> }[] }>
+  }
+
+  async function renderSearch() {
+    const section = document.querySelector<HTMLElement>('#article-search')
+    const input = section?.querySelector<HTMLInputElement>('input[name="q"]')
+    const status = section?.querySelector<HTMLElement>('#search-status')
+    const list = section?.querySelector<HTMLUListElement>('#search-results')
+    const more = section?.querySelector<HTMLButtonElement>('#search-more')
+    if (!section?.dataset.indexUrl || !input || !status || !list || !more) {
+      return
+    }
+
+    const query = new URLSearchParams(location.search).get('q')?.trim().slice(0, 180) ?? ''
+    input.value = query
+    if (!query) {
+      return
+    }
+
+    const { pending, empty, failed, count, indexUrl } = section.dataset
+    status.textContent = pending ?? ''
+
+    try {
+      const pagefind = await import(/* @vite-ignore */ indexUrl) as Pagefind
+      const { results } = await pagefind.search(query)
+      if (!results.length) {
+        status.textContent = empty ?? ''
+        return
+      }
+
+      async function appendResults() {
+        if (!list || !more || !status) {
+          return
+        }
+
+        more.disabled = true
+        const offset = list.childElementCount
+        try {
+          const rows = await Promise.all(results.slice(offset, offset + 20).map(result => result.data()))
+          for (const row of rows) {
+            const item = document.createElement('li')
+            const heading = document.createElement('h2')
+            const link = document.createElement('a')
+            link.href = row.url
+            link.textContent = row.meta.title || row.url
+            heading.append(link)
+            const snippet = document.createElement('p')
+            // Pagefind escapes the indexed text before inserting its highlight tags.
+            snippet.innerHTML = row.excerpt
+            item.append(heading, snippet)
+            list.append(item)
+          }
+          more.hidden = list.childElementCount >= results.length
+          status.textContent = count?.replace('{count}', String(results.length)) ?? ''
+        }
+        catch {
+          status.textContent = failed ?? ''
+        }
+        finally {
+          more.disabled = false
+        }
+      }
+
+      more.addEventListener('click', appendResults)
+      await appendResults()
+    }
+    catch {
+      status.textContent = failed ?? ''
+    }
+  }
+
+  document.addEventListener('astro:page-load', renderSearch)
+</script>

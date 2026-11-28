@@ -1,0 +1,112 @@
+---
+import { getLangFromPath } from '@/i18n/lang'
+import { getLocalizedPath } from '@/i18n/path'
+import { shanghaiDay } from '@/utils/shanghai-time'
+import { hasIncident, lastStatusEvent, statusEnabled } from '@/utils/site-status'
+
+const isRed = hasIncident
+const today = shanghaiDay()
+const statusPath = getLocalizedPath('/status/', getLangFromPath(Astro.url.pathname))
+const palette = isRed
+  ? { bg: '#c0271d', edge: '#ef5a4d', dot: '#ffd5d0' }
+  : { bg: '#11714a', edge: '#1f9f6b', dot: '#c6f6e0' }
+---
+
+{statusEnabled && (
+  <div
+    class:list={['status-banner', isRed ? 'is-red' : 'is-green']}
+    style={`--sb-bg:${palette.bg};--sb-edge:${palette.edge};--sb-dot:${palette.dot}`}
+    role="status"
+    aria-live="polite"
+  >
+    <span class="sb-dot" aria-hidden="true"></span>
+    <a class="sb-label" href={statusPath}>{isRed ? '运营异常' : '运营正常'}</a>
+    {isRed && lastStatusEvent?.summary && <span class="sb-message">{lastStatusEvent.summary}</span>}
+    <time class="sb-updated" data-status-today datetime={today}>{today}</time>
+  </div>
+)}
+
+<style>
+  .status-banner {
+    position: sticky;
+    top: 0;
+    z-index: 60;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.45em;
+    width: 100%;
+    box-sizing: border-box;
+    padding: 0.34em 0.9em;
+    background: var(--sb-bg);
+    color: #fff;
+    font-family: var(--font-navbar, inherit);
+    font-size: 0.75rem;
+    font-weight: 600;
+    line-height: 1.35;
+    letter-spacing: 0.02em;
+    text-align: center;
+    box-shadow: inset 0 -1px 0 var(--sb-edge);
+    backdrop-filter: saturate(120%);
+  }
+  .sb-dot {
+    flex: none;
+    width: 0.42em;
+    height: 0.42em;
+    border-radius: 999px;
+    background: var(--sb-dot);
+    box-shadow: 0 0 0 0 var(--sb-dot);
+    animation: sb-pulse 2.4s ease-out infinite;
+  }
+  @keyframes sb-pulse {
+    0% { box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.55); }
+    70% { box-shadow: 0 0 0 0.42em rgba(255, 255, 255, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(255, 255, 255, 0); }
+  }
+  .sb-label {
+    flex: none;
+    white-space: nowrap;
+  }
+  .sb-label:hover {
+    text-decoration: underline;
+  }
+  .sb-message {
+    min-width: 0;
+    overflow: hidden;
+    font-weight: 400;
+    opacity: 0.94;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .sb-updated {
+    flex: none;
+    margin-left: 0.15em;
+    font-weight: 400;
+    font-size: 0.92em;
+    opacity: 0.72;
+  }
+  .sb-updated::before {
+    content: '· ';
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .sb-dot { animation: none; }
+  }
+</style>
+
+<script>
+  import { shanghaiDay } from '@/utils/shanghai-time'
+
+  function refreshStatusDate() {
+    const day = shanghaiDay()
+    for (const time of document.querySelectorAll<HTMLTimeElement>('[data-status-today]')) {
+      if (time.dateTime !== day) {
+        time.dateTime = day
+        time.textContent = day
+      }
+    }
+  }
+
+  document.addEventListener('astro:page-load', refreshStatusDate)
+  document.addEventListener('visibilitychange', refreshStatusDate)
+  window.setInterval(refreshStatusDate, 60_000)
+</script>
